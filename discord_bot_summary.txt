@@ -1,0 +1,27 @@
+
+## Summary: Monetizable Discord Bot with MongoDB
+
+### Tech Stack
+- MongoDB Atlas: Used for storing user data, character stats, and game progress.
+- Discord Bot: Built using discord.py or discord.js.
+- Hosting: Render (already used by you), supports 24/7 uptime.
+
+### Game Concept
+- Inspired by Genshin Impact / Honkai: Star Rail, but text-based and lightweight.
+- Players summon original characters and form teams of up to 3.
+- Includes PvE (missions, bosses) and PvP (leaderboards).
+- Skill-based combat with stats like HP, ATK, DEF, SPD.
+
+### Monetization
+- Free-to-play with optional premium perks:
+  - Extra summons
+  - XP boosts
+  - Cosmetic skins
+- Leaderboard rewards: Top players can win real money (e.g., ₹500–₹2000).
+- Monetization via Patreon, Stripe, or Ko-fi.
+
+### Legal & ToS Considerations
+- Allowed under Discord ToS if:
+  - No gambling or cash-out mechanics
+  - Rewards are skill-based
+  - Transparent monetization
