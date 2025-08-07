@@ -1,0 +1,44 @@
+
+User Experience with SpaceDesk and GPU Switching on Lenovo LOQ 83DV00LWIN
+-------------------------------------------------------------------------
+
+Laptop Configuration:
+- Model: Lenovo LOQ 83DV00LWIN
+- Integrated GPU: Intel UHD Graphics
+- Dedicated GPU: NVIDIA RTX 4050
+- GPU Switching Technology: Advanced Optimus and Hybrid Mode
+- MUX Switch: Present but currently disabled
+
+Issue:
+- User is using SpaceDesk to extend display wirelessly to a phone.
+- When SpaceDesk is activated, the system switches to the integrated GPU (iGPU).
+- Even GPU-heavy tasks remain routed through the iGPU.
+- Discrete GPU (dGPU) and Optimus modes are disabled, preventing display output from switching to RTX 4050.
+
+Technical Explanation:
+- SpaceDesk creates a virtual display adapter that Windows treats as a regular monitor.
+- In Hybrid Mode, all display output is routed through the iGPU, even if the dGPU is rendering.
+- Wireless display mirroring is CPU and iGPU-friendly, and avoids using the dGPU for efficiency.
+- Advanced Optimus cannot reroute virtual displays to the dGPU.
+- The MUX switch must be enabled to allow direct dGPU output, but it is currently disabled.
+
+Troubleshooting Steps:
+1. Check Lenovo Vantage or BIOS for MUX Switch:
+   - Reboot and enter BIOS (usually via F2 or Delete).
+   - Look for GPU Mode or MUX Switch settings.
+   - If available, set to Discrete GPU Only.
+
+2. Use a Physical Monitor:
+   - Connect via HDMI or USB-C (both wired to RTX 4050).
+   - Allows full dGPU rendering and output.
+
+3. Use SpaceDesk in Wired Mode:
+   - If supported, use USB tethering or wired mirroring for better GPU usage.
+
+4. Monitor GPU Usage:
+   - Use Task Manager → Performance → GPU Engine
+   - Or NVIDIA Control Panel → System Information
+
+Additional Notes:
+- Assign specific apps to use RTX 4050 via Windows Graphics Settings.
+- Lenovo Vantage may restrict GPU mode changes based on power source or display configuration.
