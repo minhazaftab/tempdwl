@@ -1,0 +1,56 @@
+SERVER TAG THING
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+import aiohttp
+
+bot = commands.Bot(command_prefix="!", intents=discord.Intents.default())
+
+WEBHOOK_URL = "https://discord.com/api/webhooks/..."  # Replace with your webhook URL
+
+class RoleButtonView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Request Role", style=discord.ButtonStyle.primary, custom_id="request_role_button")
+    async def request_role(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Handle role assignment logic here
+        await interaction.response.send_message("Button clicked!", ephemeral=True)
+
+@bot.tree.command(name="postbutton", description="Post the role request button via webhook")
+@app_commands.checks.has_permissions(administrator=True)
+async def post_button(interaction: discord.Interaction):
+    await interaction.response.send_message("✅ Posting button via webhook...", ephemeral=True)
+
+    # Prepare the button component
+    components = [
+        {
+            "type": 1,
+            "components": [
+                {
+                    "type": 2,
+                    "label": "Request Role",
+                    "style": 1,
+                    "custom_id": "request_role_button"
+                }
+            ]
+        }
+    ]
+
+    async with aiohttp.ClientSession() as session:
+        await session.post(WEBHOOK_URL, json={
+            "username": "Role Bot",
+            "content": "",  # Optional message text
+            "components": components
+        })
+
+@post_button.error
+async def post_button_error(interaction: discord.Interaction, error):
+    if isinstance(error, app_commands.errors.MissingPermissions):
+        await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
+
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    print(f"Logged in as {bot.user}")
