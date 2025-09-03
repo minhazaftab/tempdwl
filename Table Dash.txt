@@ -1,0 +1,78 @@
+##### Response
+
+| Original Payload<A> | Mulesoft<D> | <destiny> transformation<A> |
+| :------------------ | :---------- | :--------------------------- |
+|  | vars "Id" | id |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.custType |  | accountType |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.custTypeDesc |  | description |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namCompanyNameMixed<br />OR<br />b986a386DashboardTaskResp.pB986a386OutputWksp05.namTitleMixed + b986a386DashboardTaskResp.pB986a386OutputWksp05.namFirstNameMixed + b986a386DashboardTaskResp.pB986a386OutputWksp05.namOtherNameMixed + b986a386DashboardTaskResp.pB986a386OutputWksp05.namSurnameMixed |  | name |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namTitleMixed | 'Assign to relatedParty[0].characteristic[0].value', where relatedParty[0].role=customer and relatedParty[0].$["@type"]=Customer and relatedParty[0].$["@referredType"]=Customer and relatedParty[0].$["@baseType"]=RelatedParty and relatedParty[0].characteristic[0].valueType=string and relatedParty[0].characteristic[0].name= Title | relatedParty[0].characteristic[0].value |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namFirstNameMixed | 'Assign to relatedParty[0].characteristic[0].value', where relatedParty[0].role=customer and relatedParty[0].$["@type"]=Customer and relatedParty[0].$["@referredType"]=Customer and relatedParty[0].$["@baseType"]=RelatedParty and relatedParty[0].characteristic[0].valueType=string and relatedParty[0].characteristic[0].name= FirstName | relatedParty[0].characteristic[0].value |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namSurnameMixed | 'Assign to relatedParty[0].characteristic[0].value', where relatedParty[0].role=customer and relatedParty[0].$["@type"]=Customer and relatedParty[0].$["@referredType"]=Customer and relatedParty[0].$["@baseType"]=RelatedParty and relatedParty[0].characteristic[0].valueType=string and relatedParty[0].characteristic[0].name= LastName | relatedParty[0].characteristic[0].value |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namOtherNameMixed | 'Assign to relatedParty[0].characteristic[0].value', where relatedParty[0].role=customer and relatedParty[0].$["@type"]=Customer and relatedParty[0].$["@referredType"]=Customer and relatedParty[0].$["@baseType"]=RelatedParty and relatedParty[0].characteristic[0].valueType=string and relatedParty[0].characteristic[0].name= OtherName | relatedParty[0].characteristic[0].value |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.dateBirth | 'Assign to relatedParty[0].characteristic[0].value', where relatedParty[0].role=customer and relatedParty[0].$["@type"]=Customer and relatedParty[0].$["@referredType"]=Customer and relatedParty[0].$["@baseType"]=RelatedParty and relatedParty[0].characteristic[0].valueType=string and relatedParty[0].characteristic[0].name= Date-of-Birth | relatedParty[0].characteristic[0].value |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namCompanyNameMixed | 'Assign to relatedParty[0].characteristic[0].value', where relatedParty[0].role=customer and relatedParty[0].$["@type"]=Customer and relatedParty[0].$["@referredType"]=Customer and relatedParty[0].$["@baseType"]=RelatedParty and relatedParty[0].characteristic[0].valueType=string and relatedParty[0].characteristic[0].name= CompanyName | relatedParty[0].characteristic[0].value |
+| When urn:b986a386DashboardTaskResp/urn:pB986a386OutputWksp05/urn:custType is not empty & contains BU or GV or WH, then set to BUS. Else set to RES. |  | relatedParty[0].characteristic[0].value, where relatedParty[0].characteristic[0].name = BaseAccountType and relatedParty[@Type] = Account |
+|  | Define default_currency values in in properties file and get the values | accountBalace.amount.unit |
+|  | Read from properties and assign "LIME" value to relatedParty.id, where relatedParty.role=LegalEntity | relatedParty.id |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.tosCat |  | paymentPlan.planType |
+|  | Define supports_recurring_payments values in properties file and get the values | paymentPlan.status, where paymentPlan.[@Type] = SupportsRecurringPayments |
+| When pB986a273OutputWksp05.propertiesGroup.pdePropertyId contains FLOW_ACCOUNT_NUMBER, then set to CERILLION. Else set to empty value. | Assign to accountRelationship[0].account.name, where accountRelationship[0].relationshipType = MigratedBillingSystem | accountRelationship[0].account.name |
+| When pB986a273OutputWksp05.propertiesGroup.pdePropertyId contains FLOW_ACCOUNT_NUMBER, then set to pB986a273OutputWksp05.propertiesGroup.aspPropertyValue. Else set to 0 value. | Assign to relatedParty[0].id, where relatedParty[0].role = MigratedAccount | relatedParty[0].id |
+|  | b987a275ExtBilSummTaskResp.pB987a275OutputWksp05.a00BillableAcctNo | financialAccount.id |
+| b986a02ApiAcctNoTaskResp.pB986a02OutputWksp05.billLanguage |  | billStructure.presentationMedia.id where billStructure.presentationMedia.name = BillLanguage |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.carriedFwd |  | accountBalance[*].amount.value where balanceType = lastBillAmount |
+| b986a02ApiAcctNoTaskResp.pB986a02OutputWksp05.billDate as DateTime as String { format: "dd"} as Number |  | billStructure.cycleSpecification.billingDay |
+|  | IF pB986a386OutputWksp05.osBal > 0, Copy the value "In Arrears" ELSE "Active" | paymentStatus |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.acctStat |  | state |
+|  | IF totalAmount != "", Copy the value "NetPayable" | accountBalance[n].balanceType |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.newCharges | Multiply the value by (* 0.01) | accountBalance[n].amount.value |
+|  | IF newCharges != "", Copy the value "LastBillAmount" | accountBalance[n].balanceType |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.dueDate | Copy the value in format "yyyy-MM-dd'T'hh:mm:ss" | accountBalance[n].validFor.endDateTime |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.acctPaymAmount | Multiply the value by (* 0.01) | accountBalance[n].amount.value |
+|  | IF acctPaymAmount != "", Copy the value "LastPayment Amount" | accountBalance[n].balanceType |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.paidTimeStamp | Copy the value in format "yyyy-MM-dd'T'hh:mm:ss" | accountBalance[n].validFor.endDateTime |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.overdueBal | IF businessId == PA and filter == optimize | accountBalance[n].amount.value where balanceType = Overdue Amount |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.a00DepositDue | IF businessId == PA and filter == optimize | accountBalance[n].amount.value where balanceType = DepositRequired |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.awoWrittenOffAmount | IF businessId == PA and filter == optimize | accountBalance[n].amount.value where balanceType = WrittenOffAmount |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.totalQuery | IF businessId == PA and filter == optimize | accountBalance[n].amount.value where balanceType = TotalQuery |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.osBal | IF businessId == PA and filter == optimize | accountBalance[n].amount.value where balanceType = TotalOutstandingBalance |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.a00DepositHeld | IF businessId == PA and filter == optimize | accountBalance[n].amount.value where balanceType = DepositHeld |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.a00DepositHeld | IF businessId == PA and filter == optimize | accountBalance[n].amount.value where balanceType = TotalDepositPaid |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.dobCode |  | billStructure.cycleSpecification.id |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.billMedia |  | billStructure.presentationMedia.id |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.billMediaDesc |  | billStructure.presentationMedia.name |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.lastBillDate | IF businessId == PA and filter == optimize | billStructure.cycleSpecification.billingDay |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.paymPlanInd | IF paymPlanInd == "Y", Copy the value 1 ELSE 0 | paymentPlan.priority |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.identityCode |  | relatedParty[n].id |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namTitleMixed + b986a386DashboardTaskResp.pB986a386OutputWksp05.namFirstNameMixed + b986a386DashboardTaskResp.pB986a386OutputWksp05.namOtherNameMixed + b986a386DashboardTaskResp.pB986a386OutputWksp05.namSurnameMixed |  | relatedParty[n].name |
+|  | Copy the value "customer" | relatedParty[n].role |
+| b986a106TxApiBasTaskResp.pB986a106OutputWksp05.emailDetails.emailAddress | IF businessId == PA and filter == optimize | relatedParty[0].characteristic[n].value where characteristic[n].name = Email |
+| b986a106TxApiBasTaskResp.pB986a106OutputWksp05.gender | IF businessId == PA and filter == optimize | relatedParty[0].characteristic[n].value where characteristic[n].name = Gender |
+| b986a106TxApiBasTaskResp.pB986a106OutputWksp05.custStartDate.startTimeStamp | IF businessId == PA and filter == optimize | relatedParty[0].characteristic[n].value where characteristic[n].name = StartDate |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.mktgCat |  | relatedParty[n].id |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.a00MktgCatDesc |  | relatedParty[n].name |
+|  | Copy the value "marketingCategory" | relatedParty[n].role |
+|  | Copy the value "BillingAddress" | contact[n].contactMedium[n].mediumType |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.addrLine1 |  | contact[n].contactMedium[n].characteristic.street1 |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.addrLine2 |  | contact[n].contactMedium[n].characteristic.street2 |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.addrLine4 |  | contact[n].contactMedium[n].characteristic.city |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.addrLine3 |  | contact[n].contactMedium[n].characteristic.stateOrProvince |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.addAddrLine5 |  | contact[n].contactMedium[n].characteristic.country |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.addPostcode |  | contact[n].contactMedium[n].characteristic.postCode |
+|  | phoneNo != "", copy the value "Telephone" | contact[n].contactMedium[n].mediumType |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.phoneNo |  | contact[n].contactMedium[n].characteristic.phoneNumber |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.contactData.contactMethods.a00ContactDetails | IF(vars.businessId == "PA")and a00ContactMethod == "PHONE" and a00ContactMethod != "" , copy the value "Telephone" | contact[n].contactMedium[n].characteristic.phoneNumber |
+|  | IF aeaPrimaryEmailAddress != "", copy the value "Email" | contact[n].contactMedium[n].mediumType |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.aeaPrimaryEmailAddress |  | contact[n].contactMedium[n].characteristic.emailAddress |
+|  |  |  |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00MixcaseName |  | contact[n].contactName |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00ContactType |  | contact[n].partyRoleType |
+|  | IF prContactDetailsWksp.*contactData.a00ContactMethod == "BILLEM" or "EMAIL", set the value "EMAIL" ELSE IF (prContactDetailsWksp.*contactData.a00ContactMethod == "MOB1"  or "MOB2"), set the value "Mobile"  ELSE "Telephone"<br />Note: prContactDetailsWksp.*contactData.a00ContactMethod == "MOB1" , Copy the value "Telephone"(existing mapping which will be slowly deprecating in further releases ) | contact[n].contactMedium[n].mediumType |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00ContactDetails |  | contact[n].contactMedium[n].characteristic.emailAddress |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00ContactMethod == "BILLEM", set the value "billEmail" ELSE "email" |  | contact[n].contactMedium[n].characteristic.contactType |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00ContactDetails |  | contact[n].contactMedium[n].characteristic.phoneNumber |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00ContactMethod == "PHONE", set the value "home" ELSE IF  b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00ContactMethod == "MOB2" , set the value "mobile2" else "mobile1" |  | contact[n].contactMedium[n].characteristic.contactType |
+|  | Copy the value "Bu" | creditLimit.unit |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.paymMethod |  | defaultPaymentMethod.id |
+|  | Copy the value of "Description" field according to the table **PaymentMethod** with the field of response b986a386DashboardTaskResp.pB986a386OutputWksp05.paymMethod | defaultPaymentMethod.name |
