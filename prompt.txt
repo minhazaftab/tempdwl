@@ -1,0 +1,845 @@
+I will give 2 payloads. You need to check what fields are in both and which ones values are changing in payload 1 and add those fields to the md table that I will provide as well. How you can understand by the md table itself.
+
+payload 1
+
+%dw 2.0
+import p from Mule
+import module::dateFunction as date
+var tz = date::timeZone(vars.businessId)
+var DTFORMATLIBERATE= date::DTFORMATLIBERATE
+var DATETIMEFORMATISO= date::DATETIMEFORMATISO
+output application/json skipNullOn = "everywhere"
+fun dateFormat(strDate, oldFormatFlag) =
+  if (oldFormatFlag)
+    (strDate as LocalDateTime {
+                format: "dd-MMM-yyyy HH:mm:ss"
+            } as DateTime {
+                format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+            })
+  else
+    ((strDate as LocalDateTime {format: "dd-MMM-yyyy HH:mm:ss"}) ++ tz) as String {format: DATETIMEFORMATISO}
+var basePath = vars.b986a386DashboardTask.Envelope.Body.b986a386DashboardTaskResp.pB986a386OutputWksp05
+var contData = vars.b986a386DashboardTask.Envelope.Body.b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData
+var title = if ( basePath.namTitleMixed != null ) basePath.namTitleMixed else null
+var companyName = basePath.namCompanyNameMixed
+var firstName = if ( basePath.namFirstNameMixed != null ) basePath.namFirstNameMixed else ""
+var surName = if ( basePath.namSurnameMixed != null ) basePath.namSurnameMixed else ""
+var otherName = if ( basePath.namOtherNameMixed != null ) basePath.namOtherNameMixed else ""
+var addressLine = if ( basePath.addrLine1? and basePath.addrLine1 != null ) (basePath.addrLine1 splitBy ",") else []
+fun roundDown(number,decimals) = do {var power = 10 pow decimals --- if (number>0) floor(number * power)/ power else ceil(number * power)/power}
+var businessId = lower(vars.businessId)
+var customerIdDetails= vars.b986a106TxApiBasTask.Envelope.Body.b986a106TxApiBasTaskResp.pB986a106OutputWksp05
+var blgIndicator = (customerIdDetails.*accountDetail filter ($.blgInd == 'Y') and ($.acctNo == vars.id ))
+---
+{
+    id: vars.id,
+    billable: if (!isEmpty(blgIndicator)) true else false,
+    accountType : if(!isEmpty(basePath.custType)) basePath.custType else null,
+    description : if (!isEmpty(basePath.custTypeDesc)) basePath.custTypeDesc else null ,
+    name: if (companyName != null) companyName else trim((if ( title == null ) "" else title ++ " ") ++ firstName ++ (if ( otherName == null ) "" else (" " ++ otherName[0] default "") ++ (if ( surName == null ) "" else (" " ++ surName default "")))),
+    (paymentStatus: if ( basePath.osBal > 0 ) "In Arrears" else "Active") if basePath.osBal? and basePath.osBal != null,
+    (state: (basePath.acctStat ++ "-" ++ basePath.acctStatDesc)) if basePath.acctStat != "" and basePath.acctStatDesc != null,
+    accountBalance: [if ( !isEmpty(basePath.overdueBal) ) {
+        amount: {
+            value: basePath.overdueBal * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "NetPayable"
+    } else {
+    },
+         if ( !isEmpty(basePath.newCharges) ) {
+        amount: {
+            value: basePath.newCharges * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "LastBillAmount",
+        ("validFor": {
+            // The below end Date is is the lastBillDueDate
+            "endDateTime": dateFormat(basePath.dueDate, p('oldFormatFlag'))
+        })if(!isEmpty(basePath.dueDate)),
+    }else {
+    },
+         if ( !isEmpty(basePath.acctPaymAmount) ) {
+        amount: {
+            value: basePath.acctPaymAmount * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "LastPayment Amount",
+        ("validFor": {
+            // The below endDate is mapped to the date when the last payment was recieved
+            "endDateTime": dateFormat(basePath.paidTimeStamp, p('oldFormatFlag'))
+        })if(!isEmpty(basePath.paidTimeStamp)),
+    } else {
+    },
+         if ( !isEmpty(basePath.overdueBal) ) {
+        amount: {
+            value: basePath.overdueBal * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "Overdue Amount"
+    } else {
+    },
+         if ( !isEmpty(basePath.a00DepositDue) ) {
+        amount: {
+            value: basePath.a00DepositDue * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "DepositRequired"
+    } else {
+    },
+        if ( !isEmpty(basePath.awoWrittenOffAmount) ) {
+        amount: {
+            value:  if (basePath.awoWrittenOffAmount ~= 0 ) 0.00 else  roundDown((basePath.awoWrittenOffAmount* 0.01),2),
+            "unit": vars.currencyCode
+        },
+        balanceType: "WrittenOffAmount"
+    }else{
+    }, if ( !isEmpty(basePath.totalQuery) ) {
+        amount: {
+            value: basePath.totalQuery * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "TotalQuery"
+    }else{
+    }, if ( !isEmpty(basePath.osBal) ) {
+        amount: {
+            value: basePath.osBal * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "TotalOutstandingBalance"
+    }else{
+    },if ( !isEmpty(basePath.a00DepositHeld) ) {
+        amount: {
+            value: basePath.a00DepositHeld * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "DepositHeld"
+    }else{
+    }, if ( !isEmpty(basePath.a00DepositHeld) ) {
+        amount: {
+            value: basePath.a00DepositHeld * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "TotalDepositPaid"
+    }else{
+    }] filter $ != {
+    },
+    billStructure: {
+        cycleSpecification: {
+            (id: basePath.dobCode) if basePath.dobCode? and basePath.dobCode != null,
+            paymentDueDate: if(!isEmpty(basePath.dueDate)) basePath.dueDate as LocalDateTime {format: "dd-MMM-yyyy HH:mm:ss"} as DateTime {format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"} else "",
+            billingDay:  if (!isEmpty(basePath.lastBillDate)) date::datetimeFormatter(basePath.lastBillDate,DTFORMATLIBERATE,tz) as DateTime as String { format: "dd"} as Number else ''
+            },
+        presentationMedia: [{
+            (id: basePath.billMedia) if basePath.billMedia? and basePath.billMedia != null,
+            (name: basePath.billMediaDesc) if basePath.billMediaDesc? and basePath.billMediaDesc != null
+        }]
+    },
+    paymentPlan: [{
+        priority: if ( basePath.paymPlanInd != null and basePath.paymPlanInd == "Y" ) 1 else 0,
+        planType: basePath.tosCat,
+        status: if(Mule::p('cwc.businessIds') contains vars.businessId) p(businessId ++ "." ++ 'liberate.supports_recurring_payments') as Boolean else "",
+        "@Type":"SupportsRecurringPayments"
+    }],
+    relatedParty: [
+    {
+        id: basePath.identityCode,
+        name: if (companyName != null) companyName else (if ( title == null ) "" else title ++ " ") ++ firstName ++ " " ++ (if ( otherName == "" ) "" else otherName[0] ++ " ") ++ (if ( surName == "" ) "" else surName),
+        role: "customer",
+        "@type": "Customer",
+        "@referredType": "Customer",
+        "@baseType": "RelatedParty",
+        characteristic: [
+        {
+            name: "DocumentType",
+            value: basePath.identityType
+        },
+        {
+            name: "DocumentNumber",
+            value: basePath.identityCode
+        },
+        ({
+            name: "Email",
+            value: customerIdDetails.emailDetails.emailAddress
+        }) if(!isEmpty(customerIdDetails.emailDetails.emailAddress)),
+        ({
+            name:  "Gender",
+            value: customerIdDetails.gender
+        }) if(!isEmpty(customerIdDetails.gender)),
+	    ({
+	       "name":"Title",
+	       "value": title,
+	       "valueType": "string"
+	    }) if (!isEmpty(title)),
+        {
+            "name": "FirstName",
+            "value": basePath.namFirstNameMixed ,
+            "valueType": "string"
+        },
+	    {
+	        "name":"LastName",
+	        "value": basePath.namSurnameMixed,
+	       "valueType": "string"
+	    },
+	    ({
+	        "name":"OtherName",
+	        "value": basePath.namOtherNameMixed,
+	        "valueType": "string"
+	    }) if (!isEmpty(basePath.namOtherNameMixed)),
+	    ({
+	        "name":"CompanyName",
+			"value": basePath.namCompanyNameMixed,
+			"valueType": "string"
+	    }) if(!isEmpty(basePath.namCompanyNameMixed)),
+	    ({
+	        name:"Date-Of-Birth",
+	        value: if(!isEmpty(basePath.dateBirth)) basePath.dateBirth else "",
+	       "valueType": "string"
+	    }) if(!isEmpty(basePath.dateBirth)),
+	     ({
+	        "name":"StartDate",
+	        "value": (customerIdDetails.custStartDate.startTimeStamp as LocalDateTime { format: "dd-MMM-yyyy HH:mm:ss"} ++ tz) as DateTime {format: "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"},
+	       "valueType": "DateTime"
+	    }),
+		{
+			"name": "Customer Identity",
+			"valueType": "array",
+			"value": [
+				({
+					"DocumentType": customerIdDetails.a00IdentityType1,
+					"DocumentNumber":customerIdDetails.a00IdentityCode1,
+					"DocumentDescription": customerIdDetails.a00CustIdentDesc1
+				}) if(!isEmpty(customerIdDetails.a00IdentityCode1)),
+				({
+					"DocumentType": customerIdDetails.a00IdentityType2,
+					"DocumentNumber": customerIdDetails.a00IdentityCode2,
+					"DocumentDescription": customerIdDetails.a00CustIdentDesc2
+				}) if(!isEmpty(customerIdDetails.a00IdentityCode2)),
+				({
+					"DocumentType": customerIdDetails.a00IdentityType3,
+					"DocumentNumber": customerIdDetails.a00IdentityCode3,
+					"DocumentDescription": customerIdDetails.a00CustIdentDesc3
+				}) if(!isEmpty(customerIdDetails.a00IdentityCode3)),
+				({
+					"DocumentType": customerIdDetails.a00IdentityType4,
+					"DocumentNumber": customerIdDetails.a00IdentityCode4,
+					"DocumentDescription": customerIdDetails.a00CustIdentDesc4
+				}) if(!isEmpty(customerIdDetails.a00IdentityCode4))
+					]
+		}
+	]
+    },
+    {
+        id:p('billingAccount.lib.code'),
+        role:"legalEntity"
+    },
+	{
+         "@type": "Account",
+          characteristic: [
+            {
+              name: "BaseAccountType",
+              value: if (!isEmpty(basePath.custType) and (p('liberate.cwc.bu.accounttype.code') contains basePath.custType)) 'BUS' else 'RES'
+            }
+          ]
+    },
+    ({
+        id: (basePath.mktgCat),
+        name: (basePath.a00MktgCatDesc),
+        role: "marketingCategory"
+    }) if (basePath.mktgCat != null)
+    ],
+contact: if ( basePath.addrLine1 != "" or basePath.addrLine2 != "" or basePath.addrLine3 != "" or basePath.addrLine4 != "" ) [{
+        contactMedium: [{
+            "mediumType": "BillingAddress",
+            characteristic: if (vars.businessId == p('liberate.jm.region')) {
+                (street1: addressLine[0]) if addressLine[0] != null,
+                (street2: addressLine[1]) if addressLine[1] != null,
+                (city: basePath.addrLine2) if basePath.addrLine2? and basePath.addrLine2 != null,
+                (stateOrProvince: if ( basePath.addrLine3 != null and basePath.addrLine3 !="" ) basePath.addrLine3 else basePath.addTown) if basePath.addrLine3 !="" or basePath.addTown != "",
+                (country: basePath.addrLine4) if basePath.addrLine4? and basePath.addrLine4 != null,
+                (postCode: basePath.addPostcode) if basePath.addPostcode? and basePath.addPostcode != null
+            } else if ( vars.businessId == p('liberate.pa.region') ) {
+                (street1: basePath.addrLine1) if basePath.addrLine1? and basePath.addrLine1 != null,
+                (street2: if ( basePath.addrLine2 != null and basePath.addrLine2 !="" ) basePath.addrLine2 else basePath.addTown) if basePath.addrLine2 !="" or basePath.addTown != "",
+                (city: basePath.addrLine4) if basePath.addrLine4 != null,
+                (stateOrProvince: basePath.addrLine3) if basePath.addrLine3 != null,
+                (country: basePath.addAddrLine5) if basePath.addAddrLine5? and basePath.addAddrLine5 != null,
+                (postCode: basePath.addPostcode) if basePath.addPostcode? and basePath.addPostcode != null
+            } else{
+            },
+        },
+({
+            "mediumType": Mule::p('pa.mediumType.phone'),
+            characteristic: {
+                phoneNumber: basePath.phoneNo
+            }
+        }) if basePath.phoneNo? and basePath.phoneNo != null,
+({
+            "mediumType": Mule::p('pa.mediumType.phone'),
+            characteristic: {
+                phoneNumber: basePath.serviceGroup.servNo,
+                contactType: Mule::p('pa.characteristic.contact.type')
+            }
+        }) if basePath.serviceGroup.servNo? and basePath.serviceGroup.servNo != null,
+({
+            "mediumType": Mule::p('pa.mediumType.email'),
+            characteristic: {
+                emailAddress: basePath.aeaPrimaryEmailAddress
+            }
+        }) if basePath.aeaPrimaryEmailAddress? and basePath.aeaPrimaryEmailAddress != null]
+    }] ++
+        (contData filter $.a00ContactType? and $.a00ContactType != null map
+       {
+            (contactName: $.a00MixcaseName) if $.a00MixcaseName? and $.a00MixcaseName != null,
+            (partyRoleType: $.a00ContactType) if $.a00ContactType? and $.a00ContactType != null,
+            contactMedium: ($.*contactMethods filter $.a00ContactDetails? and $.a00ContactDetails != null and ((Mule::p('pa.lib.billem') ++ Mule::p('pa.lib.mob1') ++ Mule::p('pa.lib.mob2') ++ Mule::p('pa.lib.phone') ++ Mule::p('pa.lib.email')) contains ($.a00ContactMethod default ""))) map
+        {
+                mediumType: if (($.a00ContactMethod) == (Mule::p('pa.lib.billem')) or ($.a00ContactMethod) == (Mule::p('pa.lib.email')) ) Mule::p('pa.mediumType.email') else if(($.a00ContactMethod) == (Mule::p('pa.lib.mob2'))) Mule::p('pa.mediumType.mob') else Mule::p('pa.mediumType.phone'),
+                characteristic: if (($.a00ContactMethod) == (Mule::p('pa.lib.billem')) or ($.a00ContactMethod) == (Mule::p('pa.lib.email'))) {
+                    (emailAddress: $.a00ContactDetails) if $.a00ContactDetails? and $.a00ContactDetails != null,
+                     contactType: if(($.a00ContactMethod) == (Mule::p('pa.lib.billem'))) Mule::p('pa.contactType.billem') else lower(Mule::p('pa.mediumType.email'))	
+
+			}
+		else
+			{
+                    (phoneNumber: $.a00ContactDetails) if $.a00ContactDetails? and $.a00ContactDetails != null,
+                     contactType: if(($.a00ContactMethod) == (Mule::p('pa.lib.phone'))) Mule::p('pa.contactType.home') else if(($.a00ContactMethod) == (Mule::p('pa.lib.mob2'))) Mule::p('pa.contactType.mob2') else Mule::p('pa.contactType.mob1')
+
+                }
+            } ++ (($.*contactMethods filter $.a00ContactDetails? and $.a00ContactDetails != null and (Mule::p('pa.lib.mob1') contains ($.a00ContactMethod default ""))) map	{
+				mediumType: Mule::p('pa.mediumType.mob'),
+			characteristic:  {
+                    (phoneNumber: $.a00ContactDetails) if $.a00ContactDetails? and $.a00ContactDetails != null,
+                    contactType: Mule::p('pa.contactType.mob1')
+                }
+})
+        })
+else
+flatten([
+        (contData filter $.a00ContactType? and $.a00ContactType != null map
+       {
+            (contactName: $.a00MixcaseName) if $.a00MixcaseName? and $.a00MixcaseName != null,
+            (partyRoleType: $.a00ContactType) if $.a00ContactType? and $.a00ContactType != null,
+            contactMedium: ($.*contactMethods filter $.a00ContactDetails? and $.a00ContactDetails != null and ((Mule::p('pa.lib.billem') ++ Mule::p('pa.lib.mob1') ++ Mule::p('pa.lib.mob2') ++ Mule::p('pa.lib.phone') ++ Mule::p('pa.lib.email')) contains ($.a00ContactMethod default ""))) map
+     {
+                mediumType: if (($.a00ContactMethod) == (Mule::p('pa.lib.billem')) or ($.a00ContactMethod) == (Mule::p('pa.lib.email')) ) Mule::p('pa.mediumType.email') else if(($.a00ContactMethod) == (Mule::p('pa.lib.mob2'))) Mule::p('pa.mediumType.mob') else Mule::p('pa.mediumType.phone'),
+                characteristic: if (($.a00ContactMethod) == (Mule::p('pa.lib.billem')) or ($.a00ContactMethod) == (Mule::p('pa.lib.email'))) {
+                    (emailAddress: $.a00ContactDetails) if $.a00ContactDetails? and $.a00ContactDetails != null,
+                     contactType: if(($.a00ContactMethod) == (Mule::p('pa.lib.billem'))) Mule::p('pa.contactType.billem') else lower(Mule::p('pa.mediumType.email'))
+                }
+     else
+     {
+                    (phoneNumber: $.a00ContactDetails) if $.a00ContactDetails? and $.a00ContactDetails != null,
+                     contactType: if(($.a00ContactMethod) == (Mule::p('pa.lib.phone'))) Mule::p('pa.contactType.home') else if(($.a00ContactMethod) == (Mule::p('pa.lib.mob2'))) Mule::p('pa.contactType.mob2') else Mule::p('pa.contactType.mob1')
+                }
+            } ++ (($.*contactMethods filter $.a00ContactDetails? and $.a00ContactDetails != null and (Mule::p('pa.lib.mob1') contains ($.a00ContactMethod default ""))) map	{
+				mediumType: Mule::p('pa.mediumType.mob'),
+			characteristic:  {
+                    (phoneNumber: $.a00ContactDetails) if $.a00ContactDetails? and $.a00ContactDetails != null,
+                    contactType: Mule::p('pa.contactType.mob1')
+                }
+})
+        })
+    ]),
+    defaultPaymentMethod: {
+        (id: basePath.paymMethod) if basePath.paymMethod? and basePath.paymMethod != null,
+        (name: if ( basePath.paymMethod == "E" ) "Electronic" else "Cash") if basePath.paymMethod? and basePath.paymMethod != null
+    },
+    sourceBSS: p('liberateBSS')
+}
+
+payload 2
+
+%dw 2.0
+import p from Mule
+import module::dateFunction as date
+var tz = date::timeZone(vars.businessId)
+var DTFORMATLIBERATE= date::DTFORMATLIBERATE 
+var DATETIMEFORMATISO= date::DATETIMEFORMATISO
+output application/json skipNullOn = "everywhere"
+fun dateFormat(strDate, oldFormatFlag) = 
+  if (oldFormatFlag)
+    (strDate as LocalDateTime {
+                format: "dd-MMM-yyyy HH:mm:ss"
+            } as DateTime {
+                format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+            })
+  else
+    ((strDate as LocalDateTime {format: "dd-MMM-yyyy HH:mm:ss"}) ++ tz) as String {format: DATETIMEFORMATISO}
+var basePath = vars.b986a386DashboardTask.Envelope.Body.b986a386DashboardTaskResp.pB986a386OutputWksp05
+var contData = vars.b986a386DashboardTask.Envelope.Body.b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData
+var title = if ( basePath.namTitleMixed != null ) basePath.namTitleMixed else null
+var companyName = basePath.namCompanyNameMixed
+var firstName = if ( basePath.namFirstNameMixed != null ) basePath.namFirstNameMixed else ""
+var surName = if ( basePath.namSurnameMixed != null ) basePath.namSurnameMixed else ""
+var otherName = if ( basePath.namOtherNameMixed != null ) basePath.namOtherNameMixed else ""
+var addressLine = if ( basePath.addrLine1? and basePath.addrLine1 != null ) (basePath.addrLine1 splitBy ",") else []
+var billSummaryTask = vars.b987a275ExtBilSummTask.Envelope.Body.b987a275ExtBilSummTaskResp.pB987a275OutputWksp05
+fun roundDown(number,decimals) = do {var power = 10 pow decimals --- if (number>0) floor(number * power)/ power else ceil(number * power)/power}
+var billableAccount = vars.b987a275ExtBilSummTask.Envelope.Body.b987a275ExtBilSummTaskResp.pB987a275OutputWksp05.blgInd
+var billableAccountNo= vars.b987a275ExtBilSummTask.Envelope.Body.b987a275ExtBilSummTaskResp.pB987a275OutputWksp05.a00BillableAcctNo
+var migratedBillingSystem = vars.b986a273GetPropertiesTask.Envelope.Body.b986a273GetPropertiesTaskResp.pB986a273OutputWksp05.*propertiesGroup filter (!isEmpty($.pdePropertyId))
+var isFlowAccountNo =  if (!isEmpty(migratedBillingSystem)) (migratedBillingSystem.*pdePropertyId contains 'FLOW_ACCOUNT_NUMBER') else false
+fun alterPropValue(propertyValue)=  if ((propertyValue) startsWith "FLOW") (propertyValue replace "FLOW" with "")  else propertyValue
+var propValue = (migratedBillingSystem filter ($.pdePropertyId =='FLOW_ACCOUNT_NUMBER') map alterPropValue($.aspPropertyValue))[0]
+var businessId = lower(vars.businessId)
+var customerIdDetails= vars.b986a106TxApiBasTask.Envelope.Body.b986a106TxApiBasTaskResp.pB986a106OutputWksp05
+var startDate= vars.b986a02ApiAcctNoTask
+---
+{
+    id: vars.id,
+    billable: if ( billableAccount == "Y" ) true else false,
+    accountType : if(vars.businessId == "JM" and ((lower(vars.channelId)) == "sfdc-b2c" or (lower(vars.channelId)) =="bus") and (!isEmpty(vars.b986a02ApiAcctNoTask.accountType))) vars.b986a02ApiAcctNoTask.accountType  else if(!isEmpty(basePath.custType)) basePath.custType else null,
+    description : if(vars.businessId == "JM" and ((lower(vars.channelId)) == "sfdc-b2c" or (lower(vars.channelId)) =="bus")  and (!isEmpty(vars.b986a02ApiAcctNoTask.description))) vars.b986a02ApiAcctNoTask.description else if (!isEmpty(basePath.custTypeDesc)) basePath.custTypeDesc else null ,
+    name: if (companyName != null) companyName else trim((if ( title == null ) "" else title ++ " ") ++ firstName ++ (if ( otherName == null ) "" else (" " ++ otherName[0] default "") ++ (if ( surName == null ) "" else (" " ++ surName default "")))),
+    (paymentStatus: if ( basePath.osBal > 0 ) "In Arrears" else "Active") if basePath.osBal? and basePath.osBal != null,
+    (state: (basePath.acctStat ++ "-" ++ basePath.acctStatDesc)) if basePath.acctStat != "" and basePath.acctStatDesc != null,
+    accountBalance: [if ( !isEmpty(billSummaryTask.totalAmount) ) {
+        amount: {
+            value: billSummaryTask.totalAmount * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "NetPayable"
+    } else {
+    },
+         if ( !isEmpty(basePath.newCharges) ) {
+        amount: {
+            value: basePath.newCharges * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "LastBillAmount",
+        ("validFor": {
+            // The below end Date is is the lastBillDueDate
+            "endDateTime": dateFormat(basePath.dueDate, p('oldFormatFlag'))
+        })if(!isEmpty(basePath.dueDate)),
+    }else {
+    },
+         if ( !isEmpty(basePath.acctPaymAmount) ) {
+        amount: {
+            value: basePath.acctPaymAmount * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "LastPayment Amount",
+        ("validFor": {
+            // The below endDate is mapped to the date when the last payment was recieved
+            "endDateTime": dateFormat(basePath.paidTimeStamp, p('oldFormatFlag'))
+        })if(!isEmpty(basePath.paidTimeStamp)),
+    } else {
+    },
+         if ( !isEmpty(basePath.overdueBal) ) {
+        amount: {
+            value: basePath.overdueBal * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "Overdue Amount"
+    } else {
+    },
+         if ( !isEmpty(billSummaryTask.depositReqtAmount) ) {
+        amount: {
+            value: billSummaryTask.depositReqtAmount * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "DepositRequired"
+    } else {
+    },
+        if ( !isEmpty(billSummaryTask.writeOffAmount) ) {
+        amount: {
+            value:  if (billSummaryTask.writeOffAmount ~= 0 ) 0.00 else  roundDown((billSummaryTask.writeOffAmount* 0.000001),2),
+            "unit": vars.currencyCode
+        },
+        balanceType: "WrittenOffAmount"
+    }else{
+    }, if ( !isEmpty(billSummaryTask.totalQuery) ) {
+        amount: {
+            value: billSummaryTask.totalQuery * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "TotalQuery"
+    }else{
+    }, if ( !isEmpty(basePath.osBal) ) {
+        amount: {
+            value: basePath.osBal * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "TotalOutstandingBalance"
+    }else{
+    },if ( !isEmpty(basePath.a00DepositHeld) ) {
+        amount: {
+            value: basePath.a00DepositHeld * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "DepositHeld"
+    }else{
+    }, if ( !isEmpty(billSummaryTask.a00TotalQueryTax) ) {
+        amount: {
+            value: billSummaryTask.a00TotalQueryTax * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "Total Query Tax"
+    } else {
+    },if ( !isEmpty(billSummaryTask.adjustmentCredit) ) {
+        amount: {
+            value: billSummaryTask.adjustmentCredit * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "TotalAdjustmentCredit"
+    }else{
+    }, if ( !isEmpty(billSummaryTask.amountPaid) ) {
+        amount: {
+            value: billSummaryTask.amountPaid * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "TotalDepositPaid"
+    }else{
+    }, if ( !isEmpty(billSummaryTask.servChargeCredit) ) {
+        amount: {
+            value: billSummaryTask.servChargeCredit * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "TotalServiceChargeCredit"
+    }else{
+    }, if ( !isEmpty(billSummaryTask.a00AvailablePoints) ) {
+        amount: {
+            value: billSummaryTask.a00AvailablePoints * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "TotalRewards"
+    }else{
+    }, if ( !isEmpty(billSummaryTask.a00AvailablePoiCurrency) ) {
+        amount: {
+            value: billSummaryTask.a00AvailablePoiCurrency * 0.01,
+            "unit": vars.currencyCode
+        },
+        balanceType: "TotalAvailablePointsAmount"
+    }  else {
+    }] filter $ != {
+    },
+    billStructure: {
+        cycleSpecification: {
+            (id: basePath.dobCode) if basePath.dobCode? and basePath.dobCode != null,
+            paymentDueDate: if(!isEmpty(basePath.dueDate)) basePath.dueDate as LocalDateTime {format: "dd-MMM-yyyy HH:mm:ss"} as DateTime {format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"} else "",
+            billingDay:  if (!isEmpty(vars.b986a02ApiAcctNoTask.billDate)) date::datetimeFormatter(vars.b986a02ApiAcctNoTask.billDate,DTFORMATLIBERATE,tz) as DateTime as String { format: "dd"} as Number else ''
+            },
+        presentationMedia: [{
+            (id: basePath.billMedia) if basePath.billMedia? and basePath.billMedia != null,
+            (name: basePath.billMediaDesc) if basePath.billMediaDesc? and basePath.billMediaDesc != null
+        },{
+            id:  if (vars.b986a02ApiAcctNoTask.billLanguage? and vars.b986a02ApiAcctNoTask.billLanguage != null) vars.b986a02ApiAcctNoTask.billLanguage else "",
+            name: 'BillLanguage'  
+        }]
+    },
+    paymentPlan: [{
+        priority: if ( basePath.paymPlanInd != null and basePath.paymPlanInd == "Y" ) 1 else 0,
+        planType: basePath.tosCat,
+        status: if(Mule::p('cwc.businessIds') contains vars.businessId) p(businessId ++ "." ++ 'liberate.supports_recurring_payments') as Boolean else "",
+        "@Type":"SupportsRecurringPayments"
+    }],
+    relatedParty: [
+    {
+        id: basePath.identityCode,
+        name: if (companyName != null) companyName else (if ( title == null ) "" else title ++ " ") ++ firstName ++ " " ++ (if ( otherName == "" ) "" else otherName[0] ++ " ") ++ (if ( surName == "" ) "" else surName),
+        role: "customer",
+        "@type": "Customer",
+        "@referredType": "Customer",
+        "@baseType": "RelatedParty",
+        characteristic: [
+        {
+            name: "DocumentType",
+            value: basePath.identityType
+        },
+        {
+            name: "DocumentNumber",
+            value: basePath.identityCode
+        },
+        ({
+            name: "Email",
+            value: vars.b986a02ApiAcctNoTask.email
+        }) if(!isEmpty(vars.b986a02ApiAcctNoTask.email)),
+        ({
+            name:  "Gender" ,
+            value: vars.b986a02ApiAcctNoTask.gender 
+        }) if(!isEmpty(vars.b986a02ApiAcctNoTask.gender)),
+	    ({	        
+	       "name":"Title",
+	       "value": title,
+	       "valueType": "string"
+	    }) if (!isEmpty(title)),
+        {
+            "name": "FirstName",
+            "value": basePath.namFirstNameMixed ,
+            "valueType": "string"
+        },
+	    {	        
+	        "name":"LastName",
+	        "value": basePath.namSurnameMixed,
+	       "valueType": "string"
+	    },
+	    ({
+	        "name":"OtherName",
+	        "value": basePath.namOtherNameMixed,
+	        "valueType": "string"
+	    }) if (!isEmpty(basePath.namOtherNameMixed)),
+	    ({	        
+	        "name":"CompanyName",
+			"value": basePath.namCompanyNameMixed,	       
+	       	"valueType": "string"
+	    }) if(!isEmpty(basePath.namCompanyNameMixed)),
+	    ({	        
+	        name:"Date-Of-Birth",
+	        value: if(!isEmpty(basePath.dateBirth)) basePath.dateBirth else "",
+	       "valueType": "string"
+	    }) if(!isEmpty(basePath.dateBirth)),
+	     ({	        
+	        "name":"StartDate",
+	        "value": (startDate.startDate as LocalDateTime { format: "dd-MMM-yyyy HH:mm:ss"} ++ tz) as DateTime {format: "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"},
+	       "valueType": "DateTime"
+	    }),
+		{
+			"name": "Customer Identity",
+			"valueType": "array",
+			"value": [
+				({
+					"DocumentType": customerIdDetails.a00IdentityType1,
+					"DocumentNumber":customerIdDetails.a00IdentityCode1,
+					"DocumentDescription": customerIdDetails.a00CustIdentDesc1
+				}) if(!isEmpty(customerIdDetails.a00IdentityCode1)),
+				({
+					"DocumentType": customerIdDetails.a00IdentityType2,
+					"DocumentNumber": customerIdDetails.a00IdentityCode2,
+					"DocumentDescription": customerIdDetails.a00CustIdentDesc2
+				}) if(!isEmpty(customerIdDetails.a00IdentityCode2)),
+				({
+					"DocumentType": customerIdDetails.a00IdentityType3,
+					"DocumentNumber": customerIdDetails.a00IdentityCode3,
+					"DocumentDescription": customerIdDetails.a00CustIdentDesc3
+				}) if(!isEmpty(customerIdDetails.a00IdentityCode3)),
+				({
+					"DocumentType": customerIdDetails.a00IdentityType4,
+					"DocumentNumber": customerIdDetails.a00IdentityCode4,
+					"DocumentDescription": customerIdDetails.a00CustIdentDesc4
+				}) if(!isEmpty(customerIdDetails.a00IdentityCode4))
+					]
+		}
+  		]
+    },
+    ({
+        id: if (isFlowAccountNo) propValue else "0",
+        role: "MigratedAccount"
+    }) if(!isEmpty(migratedBillingSystem..pdePropertyId)),
+    {
+        id:p('billingAccount.lib.code'),
+        role:"legalEntity"
+    },
+  	{
+          "@type": "Account",
+          characteristic: [
+            {
+              name: "BaseAccountType",
+              value: if (!isEmpty(basePath.custType) and (p('liberate.cwc.bu.accounttype.code') contains basePath.custType)) 'BUS' else 'RES'
+            }
+          ]
+    },
+    ({
+        id: (basePath.mktgCat),
+        name: (basePath.a00MktgCatDesc),
+        role: "marketingCategory"
+    }) if (basePath.mktgCat != null)
+    ],
+contact: if ( basePath.addrLine1 != "" or basePath.addrLine2 != "" or basePath.addrLine3 != "" or basePath.addrLine4 != "" ) [{
+        contactMedium: [{
+            "mediumType": "BillingAddress",
+            characteristic: if (vars.businessId == p('liberate.jm.region')) {
+                (street1: addressLine[0]) if addressLine[0] != null,
+                (street2: addressLine[1]) if addressLine[1] != null,
+                (city: basePath.addrLine2) if basePath.addrLine2? and basePath.addrLine2 != null,
+                (stateOrProvince: if ( basePath.addrLine3 != null and basePath.addrLine3 !="" ) basePath.addrLine3 else basePath.addTown) if basePath.addrLine3 !="" or basePath.addTown != "",
+                (country: basePath.addrLine4) if basePath.addrLine4? and basePath.addrLine4 != null,
+                (postCode: basePath.addPostcode) if basePath.addPostcode? and basePath.addPostcode != null
+            } else if ( vars.businessId == p('liberate.pa.region') ) {
+                (street1: basePath.addrLine1) if basePath.addrLine1? and basePath.addrLine1 != null,
+                (street2: if ( basePath.addrLine2 != null and basePath.addrLine2 !="" ) basePath.addrLine2 else basePath.addTown) if basePath.addrLine2 !="" or basePath.addTown != "",
+                (city: basePath.addrLine4) if basePath.addrLine4 != null,
+                (stateOrProvince: basePath.addrLine3) if basePath.addrLine3 != null,
+                (country: basePath.addAddrLine5) if basePath.addAddrLine5? and basePath.addAddrLine5 != null,
+                (postCode: basePath.addPostcode) if basePath.addPostcode? and basePath.addPostcode != null
+            } else{
+            },
+        },
+({
+            "mediumType": Mule::p('pa.mediumType.phone'),
+            characteristic: {
+                phoneNumber: basePath.phoneNo
+            }
+        }) if basePath.phoneNo? and basePath.phoneNo != null,
+({
+            "mediumType": Mule::p('pa.mediumType.phone'),
+            characteristic: {
+                phoneNumber: basePath.serviceGroup.servNo,
+                contactType: Mule::p('pa.characteristic.contact.type')
+            }
+        }) if basePath.serviceGroup.servNo? and basePath.serviceGroup.servNo != null,
+({
+            "mediumType": Mule::p('pa.mediumType.email'),
+            characteristic: {
+                emailAddress: basePath.aeaPrimaryEmailAddress
+            }
+        }) if basePath.aeaPrimaryEmailAddress? and basePath.aeaPrimaryEmailAddress != null]
+    }] ++
+        (contData filter $.a00ContactType? and $.a00ContactType != null map 
+       {
+            (contactName: $.a00MixcaseName) if $.a00MixcaseName? and $.a00MixcaseName != null,
+            (partyRoleType: $.a00ContactType) if $.a00ContactType? and $.a00ContactType != null,
+            contactMedium: ($.*contactMethods filter $.a00ContactDetails? and $.a00ContactDetails != null and ((Mule::p('pa.lib.billem') ++ Mule::p('pa.lib.mob1') ++ Mule::p('pa.lib.mob2') ++ Mule::p('pa.lib.phone') ++ Mule::p('pa.lib.email')) contains ($.a00ContactMethod default ""))) map
+     	{
+                mediumType: if (($.a00ContactMethod) == (Mule::p('pa.lib.billem')) or ($.a00ContactMethod) == (Mule::p('pa.lib.email')) ) Mule::p('pa.mediumType.email') else if(($.a00ContactMethod) == (Mule::p('pa.lib.mob2'))) Mule::p('pa.mediumType.mob') else Mule::p('pa.mediumType.phone'),
+                characteristic: if (($.a00ContactMethod) == (Mule::p('pa.lib.billem')) or ($.a00ContactMethod) == (Mule::p('pa.lib.email'))) {
+                    (emailAddress: $.a00ContactDetails) if $.a00ContactDetails? and $.a00ContactDetails != null,
+                     contactType: if(($.a00ContactMethod) == (Mule::p('pa.lib.billem'))) Mule::p('pa.contactType.billem') else lower(Mule::p('pa.mediumType.email'))	
+                    
+                }
+     		else
+     			{
+                    (phoneNumber: $.a00ContactDetails) if $.a00ContactDetails? and $.a00ContactDetails != null,
+                     contactType: if(($.a00ContactMethod) == (Mule::p('pa.lib.phone'))) Mule::p('pa.contactType.home') else if(($.a00ContactMethod) == (Mule::p('pa.lib.mob2'))) Mule::p('pa.contactType.mob2') else Mule::p('pa.contactType.mob1')
+                    
+                }  
+            } ++ (($.*contactMethods filter $.a00ContactDetails? and $.a00ContactDetails != null and (Mule::p('pa.lib.mob1') contains ($.a00ContactMethod default ""))) map	{
+				mediumType: Mule::p('pa.mediumType.mob'),
+            	characteristic:  {
+                    (phoneNumber: $.a00ContactDetails) if $.a00ContactDetails? and $.a00ContactDetails != null,
+                    contactType: Mule::p('pa.contactType.mob1')
+                }
+})
+        })
+else 
+flatten([
+        (contData filter $.a00ContactType? and $.a00ContactType != null map 
+       {
+            (contactName: $.a00MixcaseName) if $.a00MixcaseName? and $.a00MixcaseName != null,
+            (partyRoleType: $.a00ContactType) if $.a00ContactType? and $.a00ContactType != null,
+            contactMedium: ($.*contactMethods filter $.a00ContactDetails? and $.a00ContactDetails != null and ((Mule::p('pa.lib.billem') ++ Mule::p('pa.lib.mob1') ++ Mule::p('pa.lib.mob2') ++ Mule::p('pa.lib.phone') ++ Mule::p('pa.lib.email')) contains ($.a00ContactMethod default ""))) map
+     {
+                mediumType: if (($.a00ContactMethod) == (Mule::p('pa.lib.billem')) or ($.a00ContactMethod) == (Mule::p('pa.lib.email')) ) Mule::p('pa.mediumType.email') else if(($.a00ContactMethod) == (Mule::p('pa.lib.mob2'))) Mule::p('pa.mediumType.mob') else Mule::p('pa.mediumType.phone'),
+                characteristic: if (($.a00ContactMethod) == (Mule::p('pa.lib.billem')) or ($.a00ContactMethod) == (Mule::p('pa.lib.email'))) {
+                    (emailAddress: $.a00ContactDetails) if $.a00ContactDetails? and $.a00ContactDetails != null,
+                     contactType: if(($.a00ContactMethod) == (Mule::p('pa.lib.billem'))) Mule::p('pa.contactType.billem') else lower(Mule::p('pa.mediumType.email'))
+                }
+     else
+     {
+                    (phoneNumber: $.a00ContactDetails) if $.a00ContactDetails? and $.a00ContactDetails != null,
+                     contactType: if(($.a00ContactMethod) == (Mule::p('pa.lib.phone'))) Mule::p('pa.contactType.home') else if(($.a00ContactMethod) == (Mule::p('pa.lib.mob2'))) Mule::p('pa.contactType.mob2') else Mule::p('pa.contactType.mob1')
+                }
+            } ++ (($.*contactMethods filter $.a00ContactDetails? and $.a00ContactDetails != null and (Mule::p('pa.lib.mob1') contains ($.a00ContactMethod default ""))) map	{
+				mediumType: Mule::p('pa.mediumType.mob'),
+            	characteristic:  {
+                    (phoneNumber: $.a00ContactDetails) if $.a00ContactDetails? and $.a00ContactDetails != null,
+                    contactType: Mule::p('pa.contactType.mob1')
+                }
+})
+        })
+    ]),
+    creditLimit: {
+        unit: vars.currencyCode,
+        (value: if ( vars.businessId == "PA" ) billSummaryTask.unallocatedCredit * 0.01 else billSummaryTask.unallocatedCredit as Number) if billSummaryTask.unallocatedCredit? and billSummaryTask.unallocatedCredit != null
+    },
+    defaultPaymentMethod: {
+        (id: basePath.paymMethod) if basePath.paymMethod? and basePath.paymMethod != null,
+        (name: if ( basePath.paymMethod == "E" ) "Electronic" else "Cash") if basePath.paymMethod? and basePath.paymMethod != null
+    },
+    financialAccount: {
+        id: billableAccountNo default 0,
+        "@referredType": "FinancialAccount"
+    },
+   ( accountRelationship:[{
+        account: {
+            name: if (isFlowAccountNo) 'CERILLION' else ''
+        },
+        relationshipType : "MigratedBillingSystem"
+    }] ) if(!isEmpty(migratedBillingSystem..pdePropertyId) and isFlowAccountNo),
+    sourceBSS: p('liberateBSS')
+}
+
+md table
+
+##### Response
+
+| Original Payload<A>                                          | Mulesoft<D>                                                  | <destiny> transformation<A>                                  |
+| :----------------------------------------------------------- | :----------------------------------------------------------- | :----------------------------------------------------------- |
+|                                                              | vars "Id"                                                    | id                                                           |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.custType     |                                                              | accountType                                                  |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.custTypeDesc |                                                              | description                                                  |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namCompanyNameMixed<br />OR<br />b986a386DashboardTaskResp.pB986a386OutputWksp05.namTitleMixed + b986a386DashboardTaskResp.pB986a386OutputWksp05.namFirstNameMixed + b986a386DashboardTaskResp.pB986a386OutputWksp05.namOtherNameMixed + b986a386DashboardTaskResp.pB986a386OutputWksp05.namSurnameMixed |                                                              | name                                                         |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namTitleMixed | 'Assign to 'relatedParty[0].characteristic[0].value', where 'relatedParty[0].role=customer' and 'relatedParty[0].$["@type"]=Customer' and 'relatedParty[0].$["@referredType"]=Customer' and 'relatedParty[0].$["@baseType"]=RelatedParty' and 'relatedParty[0].characteristic[0].valueType=string' and 'relatedParty[0].characteristic[0].name= Title' | 'relatedParty[0].characteristic[0].value                     |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namFirstNameMixed | 'Assign to 'relatedParty[0].characteristic[0].value', where 'relatedParty[0].role=customer' and 'relatedParty[0].$["@type"]=Customer' and 'relatedParty[0].$["@referredType"]=Customer' and 'relatedParty[0].$["@baseType"]=RelatedParty' and 'relatedParty[0].characteristic[0].valueType=string' and 'relatedParty[0].characteristic[0].name= FirstName' | 'relatedParty[0].characteristic[0].value                     |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namSurnameMixed | 'Assign to 'relatedParty[0].characteristic[0].value', where 'relatedParty[0].role=customer' and 'relatedParty[0].$["@type"]=Customer' and 'relatedParty[0].$["@referredType"]=Customer' and 'relatedParty[0].$["@baseType"]=RelatedParty' and 'relatedParty[0].characteristic[0].valueType=string' and 'relatedParty[0].characteristic[0].name= LastName' | 'relatedParty[0].characteristic[0].value                     |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namOtherNameMixed | 'Assign to 'relatedParty[0].characteristic[0].value', where 'relatedParty[0].role=customer' and 'relatedParty[0].$["@type"]=Customer' and 'relatedParty[0].$["@referredType"]=Customer' and 'relatedParty[0].$["@baseType"]=RelatedParty' and 'relatedParty[0].characteristic[0].valueType=string' and 'relatedParty[0].characteristic[0].name= OtherName' | 'relatedParty[0].characteristic[0].value                     |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.dateBirth    | 'Assign to 'relatedParty[0].characteristic[0].value', where 'relatedParty[0].role=customer' and 'relatedParty[0].$["@type"]=Customer' and 'relatedParty[0].$["@referredType"]=Customer' and 'relatedParty[0].$["@baseType"]=RelatedParty' and 'relatedParty[0].characteristic[0].valueType=string' and 'relatedParty[0].characteristic[0].name= Date-of-Birth' | 'relatedParty[0].characteristic[0].value                     |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namCompanyNameMixed | 'Assign to 'relatedParty[0].characteristic[0].value', where 'relatedParty[0].role=customer' and 'relatedParty[0].$["@type"]=Customer' and 'relatedParty[0].$["@referredType"]=Customer' and 'relatedParty[0].$["@baseType"]=RelatedParty' and 'relatedParty[0].characteristic[0].valueType=string' and 'relatedParty[0].characteristic[0].name= CompanyName' | 'relatedParty[0].characteristic[0].value                     |
+| When 'urn:b986a386DashboardTaskResp/urn:pB986a386OutputWksp05/urn:custType is not empty' & contains BU or GV or WH, then set to 'BUS'. Else set to 'RES'. |                                                              | relatedParty[0].characteristic[0].value', where 'relatedParty[0].characteristic[0].name = BaseAccountType' and 'relatedParty[@Type] = Account' |
+|                                                              | Define default_currency values in in properties file and get the values | accountBalace.amount.unit                                    |
+|                                                              | Read from properties and assign "LIME" value to relatedParty.id, where relatedParty.role=LegalEntity | relatedParty.id                                              |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.tosCat       |                                                              | paymentPlan.planType                                         |
+|                                                              | Define supports_recurring_payments values in properties file and get the values | paymentPlan.status', where 'paymentPlan.[@Type] = SupportsRecurringPayments' |
+| When "pB986a273OutputWksp05.propertiesGroup.pdePropertyId" contains 'FLOW_ACCOUNT_NUMBER', then set to "CERILLION". Else set to empty value. | Assign to 'accountRelationship[0].account.name', where 'accountRelationship[0].relationshipType = MigratedBillingSystem' | accountRelationship[0].account.name                          |
+| When "pB986a273OutputWksp05.propertiesGroup.pdePropertyId" contains 'FLOW_ACCOUNT_NUMBER', then set to "pB986a273OutputWksp05.propertiesGroup.aspPropertyValue". Else set to 0 value. | Assign to 'relatedParty[0].id', where'relatedParty[0].role = MigratedAccount' | relatedParty[0].id                                           |
+|                                                              | b987a275ExtBilSummTaskResp.pB987a275OutputWksp05.a00BillableAcctNo | financialAccount.id                                          |
+| b986a02ApiAcctNoTaskResp.pB986a02OutputWksp05.billLanguage   |                                                              | billStructure.presentationMedia.id whre billStructure.presentationMedia.name = BillLanguage |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.carriedFwd   |                                                              | accountBalance[*].amount.value where balanceType = lastBillAmount |
+| b986a02ApiAcctNoTaskResp.pB986a02OutputWksp05.billDate as DateTime as String { format: "dd"} as Number |                                                              | billStructure.cycleSpecification.billingDay                  |
+|                                                              | IF pB986a386OutputWksp05.osBal  > 0, Copy the value "In Arrears" ELSE "Active" | paymentStatus                                                |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.acctStat     |                                                              | state                                                        |
+|                                                              | IF totalAmount != "", Copy the value "NetPayable"            | accountBalance[n].balanceType                                |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.newCharges   | Multiply the value by (\* 0.01)                              | accountBalance[n].amount.value                               |
+|                                                              | IF newCharges != "", Copy the value "LastBillAmount"         | accountBalance[n].balanceType                                |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.dueDate      | Copy the value in format "yyyy-MM-dd'T'hh:mm:ss"             | accountBalance[n].validFor.endDateTime                       |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.acctPaymAmount | Multiply the value by (\* 0.01)                              | accountBalance[n].amount.value                               |
+|                                                              | IF acctPaymAmount != "", Copy the value "LastPayment Amount" | accountBalance[n].balanceType                                |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.paidTimeStamp | Copy the value in format "yyyy-MM-dd'T'hh:mm:ss"             | accountBalance[n].validFor.endDateTime                       |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.overdueBal   | Multiply the value by (\* 0.01)                              | accountBalance[n].amount.value                               |
+|                                                              | IF overdueBal != "", Copy the value "LastPayment Amount"     | accountBalance[n].balanceType                                |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.depositReqtAmount | Multiply the value by (\* 0.01)                              | accountBalance[n].amount.value                               |
+|                                                              | IF depositReqtAmount != "", Copy the value "DepositRequired" | accountBalance[n].balanceType                                |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.writeOffAmount | Multiply the value by (\* 0.01)                              | accountBalance[n].amount.value                               |
+|                                                              | IF writeOffAmount != "", Copy the value "WrittenOffAmount"   | accountBalance[n].balanceType                                |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.totalQuery   | Multiply the value by (\* 0.01)                              | accountBalance[n].amount.value                               |
+|                                                              | IF totalQuery != "", Copy the value "TotalQuery"             | accountBalance[n].balanceType                                |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.osBal        | Multiply the value by (\* 0.01)                              | accountBalance[n].amount.value                               |
+|                                                              | IF osBal != "", Copy the value "TotalOutstandingBalance"     | accountBalance[n].balanceType                                |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.a00TotalQueryTax | Multiply the value by (\* 0.01)                              | accountBalance[n].amount.value                               |
+|                                                              | IF a00TotalQueryTax != "", Copy the value "Total Query Tax"  | accountBalance[n].balanceType                                |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.dobCode      |                                                              | billStructure.cycleSpecification.id                          |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.billMedia    |                                                              | billStructure.presentationMedia.id                           |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.billMediaDesc |                                                              | billStructure.presentationMedia.name                         |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.paymPlanInd  | IF paymPlanInd == "Y", Copy the value 1 ELSE 0               | paymentPlan.priority                                         |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.identityCode |                                                              | relatedParty[n].id                                           |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.namTitleMixed + b986a386DashboardTaskResp.pB986a386OutputWksp05.namFirstNameMixed + b986a386DashboardTaskResp.pB986a386OutputWksp05.namOtherNameMixed + b986a386DashboardTaskResp.pB986a386OutputWksp05.namSurnameMixed |                                                              | relatedParty[n].name                                         |
+|                                                              | Copy the value "customer"                                    | relatedParty[n].role                                         |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.mktgCat      |                                                              | relatedParty[n].id                                           |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.a00MktgCatDesc |                                                              | relatedParty[n].name                                         |
+|                                                              | Copy the value "marketingCategory"                           | relatedParty[n].role                                         |
+|                                                              | Copy the value "BillingAddress"                              | contact[n].contactMedium[n].mediumType                       |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.addrLine1    |                                                              | contact[n].contactMedium[n].characteristic.street1           |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.addrLine2    |                                                              | contact[n].contactMedium[n].characteristic.street2           |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.addrLine4    |                                                              | contact[n].contactMedium[n].characteristic.city              |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.addrLine3    |                                                              | contact[n].contactMedium[n].characteristic.stateOrProvince   |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.addAddrLine5 |                                                              | contact[n].contactMedium[n].characteristic.country           |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.addPostcode  |                                                              | contact[n].contactMedium[n].characteristic.postCode          |
+|                                                              | phoneNo != "", copy the value "Telephone"                    | contact[n].contactMedium[n].mediumType                       |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.phoneNo      |                                                              | contact[n].contactMedium[n].characteristic.phoneNumber       |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.contactData.contactMethods.a00ContactDetails | IF(vars.businessId == "PA")and a00ContactMethod == "PHONE" and a00ContactMethod != "" , copy the value "Telephone" | contact[n].contactMedium[n].characteristic.phoneNumber       |
+|                                                              | IF aeaPrimaryEmailAddress != "", copy the value "Email"      | contact[n].contactMedium[n].mediumType                       |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.aeaPrimaryEmailAddress |                                                              | contact[n].contactMedium[n].characteristic.emailAddress      |
+|                                                              |                                                              |                                                              |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00MixcaseName |                                                              | contact[n].contactName                                       |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00ContactType |                                                              | contact[n].partyRoleType                                     |
+|                                                              | IF prContactDetailsWksp.*contactData.a00ContactMethod == "BILLEM" or "EMAIL", set the value "EMAIL" ELSE IF (prContactDetailsWksp.*contactData.a00ContactMethod == "MOB1"  or "MOB2"), set the value "Mobile"  ELSE "Telephone"<br />Note:  prContactDetailsWksp.*contactData.a00ContactMethod == "MOB1" , Copy the value "Telephone"(existing mapping which will be slowly deprecating in further releases ) | contact[n].contactMedium[n].mediumType                       |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00ContactDetails |                                                              | contact[n].contactMedium[n].characteristic.emailAddress      |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00ContactMethod == "BILLEM", set the value "billEmail" ELSE "email" |                                                              | contact[n].contactMedium[n].characteristic.contactType       |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00ContactDetails |                                                              | contact[n].contactMedium[n].characteristic.phoneNumber       |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00ContactMethod == "PHONE", set the value "home" ELSE IF  b986a386DashboardTaskResp.pB986a386OutputWksp05.prContactDetailsWksp.*contactData.a00ContactMethod == "MOB2" , set the value "mobile2" else "mobile1" |                                                              | contact[n].contactMedium[n].characteristic.contactType       |
+|                                                              | Copy the value "Bu"                                          | creditLimit.unit                                             |
+| b986a386DashboardTaskResp.pB986a386OutputWksp05.paymMethod   |                                                              | defaultPaymentMethod.id                                      |
+|                                                              | Copy the value of "Description" field according to the table **PaymentMethod** with the field of response b986a386DashboardTaskResp.pB986a386OutputWksp05.paymMethod | defaultPaymentMethod.name
+
+
+The condition you must add for Mulesoft column is IF businessId == PA and filter == optimize
